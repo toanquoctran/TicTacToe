@@ -1,0 +1,370 @@
+<html>
+
+<body>
+    <h1 style=" text-align: center">Welcome to Tic-Tac-Toe <br></h1>
+    <h2 style="text-align: center">Human vs AI: Human first</h2>
+    <canvas style="background-color: beige;" width="600" height="600"></canvas>
+</body>
+<style>
+    .dot {
+        height: 100px;
+        width: 100px;
+        border-radius: 100%;
+        /* rounds corners */
+        background: blue;
+        position: inherit;
+    }
+
+
+    canvas {
+        padding: 0;
+        margin: auto;
+        display: block;
+        position: relative;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        right: 0;
+    }
+</style>
+<script>
+    function gameStart() {
+        //initialize canvas
+        ctx = document.querySelector('canvas').getContext('2d');
+        ctx.lineWidth = 7;
+        ctx.beginPath();
+        ctx.font = "150px Arial";
+        ctx.moveTo(0, 0); ctx.lineTo(600, 0);
+        ctx.lineTo(600, 600);
+        ctx.lineTo(0, 600);
+        ctx.lineTo(0, 0);
+        ctx.moveTo(200, 0);
+        ctx.lineTo(200, 600);
+        ctx.moveTo(400, 0);
+        ctx.lineTo(400, 600);
+        ctx.moveTo(0, 200);
+        ctx.lineTo(600, 200);
+        ctx.moveTo(0, 400);
+        ctx.lineTo(600, 400);
+        board = [
+            [-100, -100, -100],
+            [-100, -100, -100],
+            [-100, -100, -100]
+        ]
+        canvas = document.querySelector('canvas');
+
+
+        //game play here.
+        document.addEventListener('click', (event) => {
+            arr = getMousePosition(canvas, event);
+            x = arr[0]; y = arr[1];//when x is the top axis, y is the left one.
+            coordBoard = findCoordBoard(x, y); coordCanvas = findCoordCanvas(x, y);
+            if (board[coordBoard[1]][coordBoard[0]] == -100) {//if no one plays here yet. Remember to swap the position of x y whe applying to the board's arr
+                drawHuman(ctx, coordCanvas[0], coordCanvas[1]); //display human's move
+                board[coordBoard[1]][coordBoard[0]] = 1; //update board with human's move for AI to compute
+                if (isWon(board) == 1) {//human wins
+                    alert('Human wins. Click ok to reload.');
+                    window.location.reload(true);
+                }
+                if (isWon(board) == 2) {//reach 9 moves and not win, drawn is declared 
+                    alert('Drawn. Click ok to reload');
+                    window.location.reload(true);
+                }
+                //neither human wins nor drawn. AI can move.
+                else {
+                    aiMove = moveAI(board);//find the best move for AI
+                    board[aiMove[0]][aiMove[1]] = 0;//update board with AI's move
+                    drawAI(ctx, aiMove[1], aiMove[0]); //function drawAI use board Coord to draw instead of page location
+                    console.log("Board after AI move: " + board);
+                    //check status. AI has just played so there are two cases: either AI wins or nothing happens.Human cannot win here
+                    if (isWon(board) == -1) {
+                        alert('Nice try but you lost.\nClick ok to reload this page');
+                        window.location.reload(true);
+                    }
+                }
+            }
+        })
+
+        ctx.stroke();
+    }
+    
+    function AlphaZero(board, noE) //noE: number of Empty cells
+    {//return an object of: 1/ score guaranteed(0.5 or 1) 2/ (x,y) of AI's move
+    //Not only AI's moves, AlphaZero will find and expect the human to play the best move so that it can produce a counter strategy
+        if (noE==2){//base case when AI is play 1 move and humans the other
+            scoreAndCoord = AlphaZero(board);
+            return scoreAndCoord;
+        }
+        //If the current turn is human's, he/she will try to minimize the point of AI, so we will expect that the AI will get the least point out of here
+        //So from all the possibility of the human's next move, choose the one that would brings the least score for the AI.
+        possibleMove = []; //contain all the possible moves
+        for (let i =0;i<3;i++)
+        {
+            for (let j=0;j<3;j++)
+            {
+                if (board[i][j]==-100)//still empty here
+                    {
+                        possibleMove.add({row: i, col: j});
+                    }
+            }
+        }
+        let i=0;
+        tempBoard = [];
+        possibleMove.forEach(move => {
+            tempBoard[i] = board;
+            if (noE%2==1)//AI moves next, update to zero
+            {tempBoard[i][possibleMove[i].row][possibleMove[i].col] = 0; //a possibility where the AI move at possibleMove[i] coord
+            i++;}
+            else 
+            {
+                tempBoard[i][possibleMove[i].row][possibleMove[i].col] = 1; //a possibility where the human moves at possibleMove[i] coord
+                i++;
+            }
+        })//initiate all possibility
+
+        scoreArr = new Array(noE); //here to store the score guaranteed at each table
+        for (let count =0;count<noE;count++){//scoreArr[i] is the score guaranteed associated with tempBoard[i]
+            scoreArr[count] = AlphaZero(tempBoard[count], noE-1).score;
+        }   
+        if (noE%2==1) //AI moves in this round
+        {
+            let maxIndex  = FindMaxIndex(scoreArr);
+            scoreAndCoord = {
+                score: scoreArr[maxIndex],
+                row: possibleMove[maxIndex].row,
+                col: possibleMove[maxIndex].col
+            }
+            return scoreAndCoord;
+        }
+        else {//human moves, score is minimized at its best
+            let minIndex = FindMinIndex(scoreArr);
+            scoreAndCoord = {
+                score: scoreArr[minIndex],
+                row: possibleMove[minIndex].row,
+                col: possibleMove[minIndex].col
+            }
+            return scoreAndCoord;
+        }
+    }
+    function AlphaZeroBaseCase(board) //return an object contains 1/ a guaranteed point and 2/ (x,y) to achieve that guaranteed point
+    {   
+        let guaranteedScore, r, c;
+        let emptyCells =new Array(2);
+        for (let i=0;i<3;i++)
+        {
+            for (let j=0;j<3;j++ )
+            {
+                if (board[i][j]==-100)
+                    {
+                        emptyCells.add({row: i, col: j});
+                    }
+            }
+
+        }
+        
+        let tempBoard1 = board;
+        tempBoard1[emptyCells[0].row][emptyCells[0].col] =0;
+
+
+        //tempBoard1[emptyCells[1].row][emptyCells[1].col]=1;
+        let resultBefore1 = ConvertScoreForBaseCase(isWon(tempBoard1)); //1 for ai wins, 
+        if (resultBefore1==1) //if just by playing 1 more cell and ai wins
+        {
+            return {score: 1, row: emptyCells[0].row, col: emptyCells[0].col};
+        }
+        //else, playing that moves doesn't produce any shit. so score is still 0.
+
+        tempBoard1[emptyCells[1].row][emptyCells[1].col]=1;//update human moves to see
+        let resultAfter1 = ConvertScoreForBaseCase(isWon(tempBoard1));//2 if drawn, 1 human wins, -1 ai wins
+        let highScore ={score: resultAfter1 , row: emptyCells[0].row, col: emptyCells[1].col}; //score to be returned. 1 if AI wins, -1 if human wins.
+        //update highScore anyway to compare with the second result.
+
+        //to the second possibility
+        let tempBoard2 = board;
+        tempBoard2[emptyCells[1].row][emptyCells[1].col]=0;
+        let resultBefore2 = ConvertScoreForBaseCase(isWon(tempBoard2));
+        if (resultBefore2==1)
+        {
+            return {score: 1, row:emptyCells[1].row, row: emptyCells[1].col};
+        }
+        tempBoard2[emptyCells[0].row][emptyCells[0].col]=1;
+        let resultAfter2 = ConvertScoreForBaseCase(isWon(tempBoard2));
+        if (resultAfter2>highScore.score) //if the second possibility is brighter => update highScore to this shit
+        {
+            highScore.score = resultAfter2;
+            highScore.row = emptyCells[1].row;
+            highScore.col=emptyCells[1].col;
+        }
+        return highScore;
+    }
+    function ConvertScoreForBaseCase(score) {//human wins become AI lose: 1 => -1, human ties become AI ties: 2=>0, human loses become AI wins -1=>1. nothing become invalid 0=>2
+        if (score == 1)
+            return -1;
+        if (score==-1)
+            return 1;
+        if (score==2)
+            return 0;
+        return 2;
+    }
+
+    function FindMinIndex(arr){
+        if (arr.length==0)
+            return -1;
+        minIndex = 0;
+        for (let i=0;i<arr.length;i++)
+        {
+            if (arr[minIndex]>arr[i])
+                minIndex=i;
+        }
+        return minIndex;
+
+    }
+
+    function FindMaxIndex(arr)
+    {
+        
+        if (arr.length==0) {return -1;}
+        let maxIndex=0;
+        for (let i =0;i<arr.length;i++)
+        {
+            if (arr[i]>arr[maxIndex])
+                maxIndex=i;
+        }
+        return maxIndex;
+    }
+
+    function moveAI(board) {//return a tuple of (x,y) in AI's turn, parameterized with. Only used when there is at least 1 more square for AI to move
+        //1 is human's move. 0 is AI's move. Randomize the next move until find out an empty cell. Return this cell
+        //Because we have checked that there is at least 1 empty cell, this must be true;
+        while (true) {
+            x = Math.floor(Math.random() * 3);
+            y = Math.floor(Math.random() * 3);
+
+            if (board[x][y] == -100)
+                break;
+        }
+        console.log("AI move:" + x + " " + y);
+        return [x, y];
+    }
+
+    function getMousePosition(canvas, event) {//return coord of X, Y relative to the canvas
+        let rect = canvas.getBoundingClientRect();
+        let x = event.clientX - rect.left;
+        let y = event.clientY - rect.top;
+        return [x, y];
+    }
+
+    function findCoordBoard(x, y) {//return indices of the last click to update it to the board
+        let realX, realY;
+        if (x < 200) {
+            realX = 0;
+        } else if (x < 400) {
+            realX = 1;
+        } else if (x < 600) {
+            realX = 2;
+        }
+        if (y < 200) {
+            realY = 0;
+        } else if (y < 400) {
+            realY = 1;
+        } else if (y < 600) {
+            realY = 2;
+        }
+        return [realX, realY];
+    }
+
+    function findCoordCanvas(x, y) {//find the center coordinate on the canvas to supple either drawAI or drawHuman
+
+        let realX, realY;
+        if (x < 200) {
+            realX = 100;
+        } else if (x < 400) {
+            realX = 300;
+        } else if (x < 600) {
+            realX = 500;
+        }
+        if (y < 200) {
+            realY = 100;
+        } else if (y < 400) {
+            realY = 300;
+        } else if (y < 600) {
+            realY = 500;
+        }
+        return [realX, realY];
+    }
+
+    function drawHuman(ctx, x, y) {//draw human's move on the canvas
+        let arr = findCoordCanvas(x, y);
+
+        ctx.fillStyle = "red";
+        ctx.fillText('X', x - 50, y + 50);
+
+    }
+
+    function drawAI(ctx, x, y) {//use when moveAI is called and draw such move on the canvas
+        let realX, realY;
+        if (x == 0) {
+            realX = 100;
+        } else if (x == 1) {
+            realX = 300;
+        } else if (x == 2) {
+            realX = 500;
+        }
+
+        if (y == 0) {
+            realY = 100;
+        } else if (y == 1) {
+            realY = 300;
+        } else if (y == 2) {
+            realY = 500;
+        }
+        ctx.fillStyle = "blue";
+        ctx.fillText('O', realX - 50, realY + 50);
+    }
+
+    function isWon(board) {//human 1, ai 0 on the board. return 1 if human wins, -1 if ai wins, 0 if nothing yet, 2 if drawn. In case of a drawn game, check if count = 9 
+
+        if (areAllEqual(board[0][0], board[1][1], board[2][2], 0) ||//diagonal \
+            areAllEqual(board[0][2], board[1][1], board[2][0], 0) ||//diagonal /
+            areAllEqual(board[0][0], board[1][0], board[2][0], 0) ||
+            areAllEqual(board[0][1], board[1][1], board[2][1], 0) ||
+            areAllEqual(board[0][2], board[1][2], board[2][2], 0) ||//vertical 
+            areAllEqual(board[0][0], board[0][1], board[0][2], 0) ||
+            areAllEqual(board[1][0], board[1][1], board[1][2], 0) ||
+            areAllEqual(board[2][0], board[2][1], board[2][2], 0))//horizontal
+        {
+            return -1;
+        }
+        if (areAllEqual(board[0][0], board[1][1], board[2][2], 1) ||//diagonal \
+            areAllEqual(board[0][2], board[1][1], board[2][0], 1) ||//diagonal /
+            areAllEqual(board[0][0], board[1][0], board[2][0], 1) ||
+            areAllEqual(board[0][1], board[1][1], board[2][1], 1) ||
+            areAllEqual(board[0][2], board[1][2], board[2][2], 1) ||//vertical 
+            areAllEqual(board[0][0], board[0][1], board[0][2], 1) ||
+            areAllEqual(board[1][0], board[1][1], board[1][2], 1) ||
+            areAllEqual(board[2][0], board[2][1], board[2][2], 1))//horizontal
+        {
+            return 1;
+        }
+        let count = 0;
+        board.forEach(subarr => {
+            subarr.forEach(elem => {
+                if (elem != -100) { count++ };
+            })
+        });
+        if (count == 9) {
+            return 2;//neither won nor lost, then drawn
+        }
+        return 0; //no shit happened yet
+    }
+
+    function areAllEqual(x, y, z, val) {//check if x==y==z!=val
+        if (x == y && y == z && x == val)
+            return true;
+        return false;
+    }
+
+    gameStart();
+</script>
+
+</html>
